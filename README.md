@@ -24,7 +24,7 @@ Para llevar a cabo este proyecto, necesitarás los siguientes materiales. Puedes
 2. 📝 Sigue las instrucciones detalladas en el repositorio para ensamblar y configurar tu deshidratador IoT.
 3. 📲 Conéctate a la aplicación móvil o interfaz web para comenzar a controlar y monitorear tu deshidratador.
 
-Estamos emocionados de que formes parte de este proyecto y esperamos que disfrutes aprendiendo y construyendo tu propio deshidratador IoT. Si tienes alguna pregunta o necesitas ayuda, no dudes en abrir un issue en el repositorio o unirte a nuestra comunidad en Discord.
+Estamos emocionados de que formes parte de este proyecto y esperamos que disfrutes aprendiendo y construyendo tu propio deshidratador IoT. Si tienes alguna pregunta o necesitas ayuda, no dudes en abrir un issue en el repositorio.
 
 ¡Buena suerte y feliz deshidratación! 🌞🍎
 
