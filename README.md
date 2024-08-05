@@ -1,4 +1,4 @@
-# 🎉 **Bienvenida al Proyecto Deshidratador IoT con ESP32** 🎉
+# 🎉 **Bienvenido al Proyecto Deshidratador IoT con ESP32** 🎉
 
 ¡Bienvenidos al proyecto **Deshidratador IoT con ESP32**! En este proyecto, aprenderás a construir un deshidratador controlado por un microcontrolador ESP32, que utiliza varios sensores para monitorear y controlar el proceso de deshidratación.
 
