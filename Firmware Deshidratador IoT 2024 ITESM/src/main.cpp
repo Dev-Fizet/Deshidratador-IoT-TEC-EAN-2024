@@ -12,7 +12,8 @@
 #include <BH1750.h>
 
 // CHANGE // // CHANGE // // CHANGE // // CHANGE //
-String SECRET_NAME_TEAM = "Carlos-Fizet";      // replace Carlos-Fizet with your name Team
+#define TEAM_INITIALS "CRFZ"                 // Escribe las iniciales de tu equipo aquí
+#define SECRET_NAME_TEAM "Carlos-Fizet"      // replace Carlos-Fizet with your name Team
 boolean Calibration_Weight_Sensor = false;     // false Not Calibration // true Calibration
 double Known_Weight = 14.7;                    // Replace 14.6 with the value of the known object's weight in grams
 double Scale_Calibration_Result = 773;         // Replace 817 with the value result after of the process of calibration
@@ -45,6 +46,9 @@ float Weight_Sensor;
 #define DHTTYPE DHT11     // Define el tipo de sensor DHT
 DHT dht(DHTPIN, DHTTYPE);
 
+// Pines I2C para el sensor BH1750
+#define SDA_PIN 21  // Pin SDA
+#define SCL_PIN 22  // Pin SCL
 BH1750 lightMeter;
 
 void tick()
@@ -110,15 +114,18 @@ void setup()
   Serial.begin(115200);
   Serial.println("Deshidratador IoT TEC EAN 2024");
 
+  // Obtener la dirección MAC del ESP32 y formatearla
+  String mac = WiFi.macAddress();
+  mac.replace(":", "");  // Quitar los dos puntos de la MAC
+  String name_iot = "Deshidratador IoT 2024" + mac + " " + TEAM_INITIALS;  // Concatenar MAC e iniciales al nombre de la red
+
   if (Calibration_Weight_Sensor == false)
   {
     Serial.println("Mode Normal");
     WiFiManager wm;
 
     bool res;
-    String name_iot = "Deshidratador IoT ";
-    String name_device = name_iot + SECRET_NAME_TEAM;
-    res = wm.autoConnect("Deshidratador IoT"); // password protected ap
+    res = wm.autoConnect(name_iot.c_str()); // Usar la cadena con el nombre modificado
     ticker.attach(0.1, tick);
 
     if (!res)
@@ -183,7 +190,7 @@ void setup()
     Serial.println(scale.get_units(5), 1);
 
     // Inicializar el sensor de luz BH1750
-    Wire.begin();
+    Wire.begin(SDA_PIN, SCL_PIN);  // Establecer los pines I2C
     if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE))
     {
       Serial.println("Sensor de luz BH1750 inicializado correctamente.");
@@ -262,42 +269,13 @@ void loop()
       Serial.print(tempC_Sensor_2);
       Serial.print(" Temp F: ");
       Serial.println(DallasTemperature::toFahrenheit(tempC_Sensor_2));
-      digitalWrite(LED_WiFi, LOW);
+
+      Weight_Sensor = scale.get_units(10);
+      Serial.print("Peso: ");
+      Serial.print(Weight_Sensor);
+      Serial.println(" gramos");
+
+      previousMillis = currentMillis;
     }
-
-    // Lectura del sensor de peso
-    scale.power_up();
-    Serial.print("one reading:\t");
-    Serial.print(scale.get_units(), 1);
-    Serial.print("\t| average:\t");
-    Weight_Sensor = scale.get_units(10);
-    Serial.println(scale.get_units(10), 1);
-
-    scale.power_down(); // put the load cell to sleep
-  }
-  else
-  {
-    // Modo de calibración del sensor de peso
-    scale.set_scale();
-    Serial.print("Toma un peso conocido de ");
-    Serial.print(Known_Weight, 3);
-    Serial.println(" gramos.");
-    Serial.println("Coloca el peso conocido en la balanza.");
-    Serial.println("Esperando a que el valor se estabilice...");
-    delay(2000);
-
-    scale.tare(); // Reset the scale to 0
-
-    Serial.print("Lectura estable: ");
-    Serial.println(scale.get_units(10), 3);
-
-    Serial.println("Calculando el factor de calibración...");
-    scale.set_scale(Known_Weight / scale.get_units(10));
-
-    Serial.print("Factor de calibración: ");
-    Serial.println(scale.get_scale(), 3);
-
-    // Con este valor, se puede ajustar `Scale_Calibration_Result` para el uso normal.
-    while (true); // Para evitar continuar ejecutando el bucle
   }
 }
