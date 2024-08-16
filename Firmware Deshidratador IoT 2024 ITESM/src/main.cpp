@@ -114,7 +114,7 @@ void checkWiFiConnection()
             lastReconnectAttempt = currentMillis;
             Serial.println("Intentando reconectar a WiFi...");
             WiFiManager wm;
-            wm.setTimeout(60);                                               // 1minutos para intentar la conexión
+            wm.setTimeout(60);                                               // 1 minuto para intentar la conexión
             String ssid = "Deshidratador IoT 2024 " + String(TEAM_INITIALS); // Nombre de la red
             digitalWrite(LED_WiFi, HIGH);
             if (!wm.autoConnect(ssid.c_str()))
