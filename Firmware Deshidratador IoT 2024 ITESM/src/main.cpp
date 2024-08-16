@@ -11,271 +11,269 @@
 #include <Wire.h>
 #include <BH1750.h>
 
-// CHANGE // // CHANGE // // CHANGE // // CHANGE //
-#define TEAM_INITIALS "CRFZ"                 // Escribe las iniciales de tu equipo aquí
-#define SECRET_NAME_TEAM "Carlos-Fizet"      // replace Carlos-Fizet with your name Team
-boolean Calibration_Weight_Sensor = false;     // false Not Calibration // true Calibration
-double Known_Weight = 14.7;                    // Replace 14.6 with the value of the known object's weight in grams
-double Scale_Calibration_Result = 773;         // Replace 817 with the value result after of the process of calibration
-#define SECRET_CH_ID 2258947                   // replace 0000000 with your channel number of ThingSpeak
-#define SECRET_WRITE_APIKEY "WFQCMUA1Y5X6QIE5" // replace XYZ with your channel write API Key of ThingSpeak
-// CHANGE // // CHANGE // // CHANGE // // CHANGE //
+// Configuración agrupada
+#define TEAM_INITIALS "CRFZ"                   // Iniciales del equipo
+#define SECRET_NAME_TEAM "Carlos-Fizet"        // Nombre del equipo
+#define SECRET_CH_ID 2627355                   // ID del canal de ThingSpeak
+#define SECRET_WRITE_APIKEY "IRFNZHLR3V1U3GNB" // Clave API de ThingSpeak
 
-// HX711 Circuit wiring
-const int LOADCELL_DOUT_PIN = 2; // GPIO2 D2
-const int LOADCELL_SCK_PIN = 4;  // GPIO4 D4
+boolean Calibration_Weight_Sensor = false; // Modo de calibración de sensor de peso
+double Known_Weight = 14.7;                // Peso conocido para la calibración
+double Scale_Calibration_Result = 263;     // Resultado de calibración de la balanza
 
+// Definiciones para pines
+#define SDA_PIN 13
+#define SCL_PIN 12
+#define VCC_VIRTUAL_PIN_1 27
+#define GND_VIRTUAL_PIN_2 14
+#define DHT_VIRTUAL_PIN_GND 33
+#define DHT_VIRTUAL_PIN_VCC 26
+#define DHT_DATA_PIN 25
+#define ONE_WIRE_BUS 15
+const int LOADCELL_DOUT_PIN = 2;
+const int LOADCELL_SCK_PIN = 4;
+
+// Inicialización de objetos
 HX711 scale;
-
 WiFiClient client;
-unsigned long myChannelNumber = SECRET_CH_ID;
-const char *myWriteAPIKey = SECRET_WRITE_APIKEY;
-String myStatus = "";
-
-unsigned long previousMillis = 0;
-const long interval = 1000;
-
 Ticker ticker;
+DHT dht(DHT_DATA_PIN, DHT11);
+BH1750 lightMeter;
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+DeviceAddress Sensor_1, Sensor_2;
+
+// Variables globales
 int LED_WiFi = 2;
 float tempC_Sensor_1;
 float tempC_Sensor_2;
 float Weight_Sensor;
+unsigned long previousMillis = 0; // Declaración de la variable global
+const long interval = 1000;       // Declaración de la variable global
 
-// Sensores adicionales
-#define DHTPIN 5          // Pin GPIO donde se conecta el DHT11
-#define DHTTYPE DHT11     // Define el tipo de sensor DHT
-DHT dht(DHTPIN, DHTTYPE);
-
-// Pines I2C para el sensor BH1750
-#define SDA_PIN 21  // Pin SDA
-#define SCL_PIN 22  // Pin SCL
-BH1750 lightMeter;
-
-void tick()
-{
-  // toggle state
-  int state = digitalRead(LED_WiFi); // get the current state of GPIO1 pin
-  digitalWrite(LED_WiFi, !state);    // set pin to the opposite state
-}
-
+// Función de actualización de estado
 void tick_update_channel()
 {
-  ThingSpeak.setField(1, tempC_Sensor_1);
-  ThingSpeak.setField(2, tempC_Sensor_2);
-  ThingSpeak.setField(3, Weight_Sensor);
-  ThingSpeak.setField(4, dht.readTemperature());  // Temperatura ambiente
-  ThingSpeak.setField(5, dht.readHumidity());     // Humedad relativa
-  ThingSpeak.setField(6, lightMeter.readLightLevel()); // Luz en lux
-  myStatus = String("Deshidratador IoT OK");
-  ThingSpeak.setStatus(myStatus);
+    ThingSpeak.setField(1, tempC_Sensor_1);
+    ThingSpeak.setField(2, tempC_Sensor_2);
+    ThingSpeak.setField(3, Weight_Sensor);
+    ThingSpeak.setField(4, dht.readTemperature());
+    ThingSpeak.setField(5, dht.readHumidity());
+    ThingSpeak.setField(6, lightMeter.readLightLevel());
+    String myStatus = "Deshidratador IoT OK";
+    ThingSpeak.setStatus(myStatus);
 
-  // write to the ThingSpeak channel
-  int x = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
-  if (x == 200)
-  {
-    Serial.println("Channel update successful.");
-  }
-  else
-  {
-    Serial.println("Problem updating channel. HTTP error code " + String(x));
-  }
+    int x = ThingSpeak.writeFields(SECRET_CH_ID, SECRET_WRITE_APIKEY);
+    if (x == 200)
+    {
+        Serial.println("Actualización del canal exitosa.");
+    }
+    else
+    {
+        Serial.println("Problema actualizando el canal. Código de error HTTP: " + String(x));
+    }
+}
+void tick()
+{
+    // toggle state
+    int state = digitalRead(LED_WiFi); // get the current state of GPIO1 pin
+    digitalWrite(LED_WiFi, !state);    // set pin to the opposite state
 }
 
-#define ONE_WIRE_BUS 15 // GPIO15 D15
-OneWire oneWire(ONE_WIRE_BUS);
-
-DallasTemperature sensors(&oneWire);
-
-DeviceAddress Sensor_1, Sensor_2;
-
+// Función para imprimir la dirección del dispositivo
 void printAddress(DeviceAddress deviceAddress)
 {
-  for (uint8_t i = 0; i < 8; i++)
-  {
-    if (deviceAddress[i] < 16)
-      Serial.print("0");
-    Serial.print(deviceAddress[i], HEX);
-  }
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        if (deviceAddress[i] < 16)
+            Serial.print("0");
+        Serial.print(deviceAddress[i], HEX);
+    }
 }
 
+// Función para imprimir la resolución del dispositivo
 void printResolution(DeviceAddress deviceAddress)
 {
-  Serial.print("Resolution: ");
-  Serial.print(sensors.getResolution(deviceAddress));
-  Serial.println();
+    Serial.print("Resolución: ");
+    Serial.print(sensors.getResolution(deviceAddress));
+    Serial.println();
 }
 
 void setup()
 {
-  pinMode(LED_WiFi, OUTPUT);
-  digitalWrite(LED_WiFi, LOW);
-  ticker.attach(0.6, tick);
+    pinMode(LED_WiFi, OUTPUT);
+    digitalWrite(LED_WiFi, LOW);
+    ticker.attach(0.6, tick);
+    Serial.begin(115200);
+    Serial.println("Deshidratador IoT TEC EAN 2024");
 
-  Serial.begin(115200);
-  Serial.println("Deshidratador IoT TEC EAN 2024");
+    // Configuración de pines virtuales
+    pinMode(VCC_VIRTUAL_PIN_1, OUTPUT);
+    pinMode(GND_VIRTUAL_PIN_2, OUTPUT);
+    pinMode(DHT_VIRTUAL_PIN_GND, OUTPUT);
+    pinMode(DHT_VIRTUAL_PIN_VCC, OUTPUT);
+    digitalWrite(VCC_VIRTUAL_PIN_1, HIGH);
+    digitalWrite(GND_VIRTUAL_PIN_2, LOW);
+    digitalWrite(DHT_VIRTUAL_PIN_GND, LOW);
+    digitalWrite(DHT_VIRTUAL_PIN_VCC, HIGH);
 
-  // Obtener la dirección MAC del ESP32 y formatearla
-  String mac = WiFi.macAddress();
-  mac.replace(":", "");  // Quitar los dos puntos de la MAC
-  String name_iot = "Deshidratador IoT 2024" + mac + " " + TEAM_INITIALS;  // Concatenar MAC e iniciales al nombre de la red
+    //
+    // Obtener la dirección MAC del ESP32 y formatearla
+    String name_iot = "Deshidratador IoT 2024 " + String(TEAM_INITIALS); // Nombre de la red sin MAC
 
-  if (Calibration_Weight_Sensor == false)
-  {
-    Serial.println("Mode Normal");
-    WiFiManager wm;
-
-    bool res;
-    res = wm.autoConnect(name_iot.c_str()); // Usar la cadena con el nombre modificado
-    ticker.attach(0.1, tick);
-
-    if (!res)
+    if (Calibration_Weight_Sensor == false)
     {
-      Serial.println("Failed to connect");
+        Serial.println("Modo Normal");
+        WiFiManager wm;
+
+        bool res;
+        res = wm.autoConnect(name_iot.c_str()); // Usar la cadena con el nombre modificado
+        ticker.attach(0.1, tick);
+
+        if (!res)
+        {
+            Serial.println("No se pudo conectar");
+        }
+        else
+        {
+            Serial.println("Conectado... ¡yey :)");
+            ticker.detach();
+            digitalWrite(LED_WiFi, LOW);
+        }
     }
     else
     {
-      Serial.println("connected...yeey :)");
-      ticker.detach();
-      digitalWrite(LED_WiFi, LOW);
+        Serial.println("Mode Calibration Weight Sensor");
     }
-  }
-  else
-  {
-    Serial.println("Mode Calibration Weight Sensor");
-  }
-
-  // Inicializar HX711
-  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-
-  if (Calibration_Weight_Sensor == false)
-  {
-    sensors.begin();
-    Serial.println("Buscando Sensores de Temperatura DS18B20...");
-
-    if (!sensors.getAddress(Sensor_1, 0))
+    scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+    if (!Calibration_Weight_Sensor)
     {
-      Serial.println("Error en Sensor 1");
-      digitalWrite(LED_WiFi, HIGH);
-      while (true);
+        sensors.begin();
+        Serial.println("Buscando sensores de temperatura DS18B20...");
+        if (!sensors.getAddress(Sensor_1, 0))
+        {
+            Serial.println("Error en Sensor 1");
+            digitalWrite(LED_WiFi, HIGH);
+            while (true)
+                ;
+        }
+        if (!sensors.getAddress(Sensor_2, 1))
+        {
+            Serial.println("Error en Sensor 2");
+            digitalWrite(LED_WiFi, HIGH);
+            while (true)
+                ;
+        }
+        sensors.setResolution(Sensor_1, 12);
+        sensors.setResolution(Sensor_2, 12);
+        ThingSpeak.begin(client);
+
+        ticker.attach(20, tick_update_channel);
+        Serial.println("Inicializando la balanza");
+        scale.set_scale(Scale_Calibration_Result);
+        scale.tare();
+        Wire.begin(SDA_PIN, SCL_PIN);
+        if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE))
+        {
+            Serial.println("Sensor de luz BH1750 inicializado correctamente.");
+        }
+        else
+        {
+            Serial.println("Error al inicializar el BH1750.");
+        }
+        dht.begin();
     }
-    if (!sensors.getAddress(Sensor_2, 1))
-    {
-      Serial.println("Error en Sensor 2");
-      digitalWrite(LED_WiFi, HIGH);
-      while (true);
-    }
-    Serial.println("Sensores OK!");
-    sensors.setResolution(Sensor_1, 12);
-    sensors.setResolution(Sensor_2, 12);
-
-    ThingSpeak.begin(client);
-    ticker.attach(20, tick_update_channel);
-
-    Serial.println("Inicializando la balanza");
-
-    scale.set_scale(Scale_Calibration_Result);
-    scale.tare(); // reset the scale to 0
-
-    Serial.println("Después de configurar la balanza:");
-    Serial.print("lectura: \t\t");
-    Serial.println(scale.read()); 
-
-    Serial.print("lectura promedio: \t\t");
-    Serial.println(scale.read_average(20)); 
-
-    Serial.print("obtener valor: \t\t");
-    Serial.println(scale.get_value(5)); 
-
-    Serial.print("obtener unidades: \t\t");
-    Serial.println(scale.get_units(5), 1);
-
-    // Inicializar el sensor de luz BH1750
-    Wire.begin(SDA_PIN, SCL_PIN);  // Establecer los pines I2C
-    if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE))
-    {
-      Serial.println("Sensor de luz BH1750 inicializado correctamente.");
-    }
-    else
-    {
-      Serial.println("Error al inicializar el BH1750.");
-    }
-
-    // Inicializar el sensor DHT11
-    dht.begin();
-  }
 }
 
 void loop()
 {
-  if (Calibration_Weight_Sensor == false)
-  {
-    Serial.println("-----------------------------");
-    unsigned long currentMillis = millis();
-    if (currentMillis - previousMillis >= interval)
+    if (!Calibration_Weight_Sensor)
     {
-      sensors.requestTemperatures();
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMillis >= interval)
+        {
+            sensors.requestTemperatures();
+            float humidity = dht.readHumidity();
+            float tempC_Ambient = dht.readTemperature();
+            if (isnan(humidity) || isnan(tempC_Ambient))
+            {
+                Serial.println("Error al leer el DHT11.");
+            }
+            else
+            {
+                Serial.println("-----------------------------");
+                digitalWrite(LED_WiFi, HIGH);
+                Serial.print("Humedad: ");
+                Serial.print(humidity);
+                Serial.print("%  Temperatura Ambiente: ");
+                Serial.print(tempC_Ambient);
+                Serial.println("°C");
+            }
 
-      // Lectura de temperatura y humedad con DHT11
-      float humidity = dht.readHumidity();
-      float tempC_Ambient = dht.readTemperature();
-      
-      if (isnan(humidity) || isnan(tempC_Ambient))
-      {
-        Serial.println("Error al leer el DHT11.");
-      }
-      else
-      {
-        Serial.print("Humedad: ");
-        Serial.print(humidity);
-        Serial.print("%  Temperatura Ambiente: ");
-        Serial.print(tempC_Ambient);
-        Serial.println("°C");
-      }
+            float lux = lightMeter.readLightLevel();
+            if (lux == -1)
+            {
+                Serial.println("Error al leer el BH1750.");
+            }
+            else
+            {
+                Serial.print("Luz: ");
+                Serial.print(lux);
+                Serial.println(" lux");
+            }
 
-      // Lectura del sensor de luz BH1750
-      float lux = lightMeter.readLightLevel();
-      if (lux == -1)
-      {
-        Serial.println("Error al leer el BH1750.");
-      }
-      else
-      {
-        Serial.print("Luz: ");
-        Serial.print(lux);
-        Serial.println(" lux");
-      }
+            tempC_Sensor_1 = sensors.getTempC(Sensor_1);
+            if (tempC_Sensor_1 == DEVICE_DISCONNECTED_C)
+            {
+                Serial.println("Error: No se pudo leer el dato de temperatura");
+                return;
+            }
+            Serial.print("Sensor 1 => ");
+            Serial.print("Temp C: ");
+            Serial.print(tempC_Sensor_1);
+            Serial.print(" Temp F: ");
+            Serial.println(DallasTemperature::toFahrenheit(tempC_Sensor_1));
 
-      // Lectura de los sensores DS18B20
-      tempC_Sensor_1 = sensors.getTempC(Sensor_1);
-      if (tempC_Sensor_1 == DEVICE_DISCONNECTED_C)
-      {
-        Serial.println("Error: Could not read temperature data");
-        return;
-      }
-      Serial.print("Sensor 1 => ");
-      Serial.print("Temp C: ");
-      Serial.print(tempC_Sensor_1);
-      Serial.print(" Temp F: ");
-      Serial.println(DallasTemperature::toFahrenheit(tempC_Sensor_1));
+            tempC_Sensor_2 = sensors.getTempC(Sensor_2);
+            if (tempC_Sensor_2 == DEVICE_DISCONNECTED_C)
+            {
+                Serial.println("Error: No se pudo leer el dato de temperatura");
+                return;
+            }
+            Serial.print("Sensor 2 => ");
+            Serial.print("Temp C: ");
+            Serial.print(tempC_Sensor_2);
+            Serial.print(" Temp F: ");
+            Serial.println(DallasTemperature::toFahrenheit(tempC_Sensor_2));
 
-      tempC_Sensor_2 = sensors.getTempC(Sensor_2);
-      if (tempC_Sensor_2 == DEVICE_DISCONNECTED_C)
-      {
-        Serial.println("Error: Could not read temperature data");
-        return;
-      }
-      Serial.print("Sensor 2 => ");
-      Serial.print("Temp C: ");
-      Serial.print(tempC_Sensor_2);
-      Serial.print(" Temp F: ");
-      Serial.println(DallasTemperature::toFahrenheit(tempC_Sensor_2));
-
-      Weight_Sensor = scale.get_units(10);
-      Serial.print("Peso: ");
-      Serial.print(Weight_Sensor);
-      Serial.println(" gramos");
-
-      previousMillis = currentMillis;
+            Weight_Sensor = scale.get_units(10);
+            Serial.print("Peso: ");
+            Serial.print(Weight_Sensor);
+            Serial.println(" gramos");
+            digitalWrite(LED_WiFi, LOW);
+            previousMillis = currentMillis;
+        }
     }
-  }
+    else
+    {
+        if (scale.is_ready())
+        {
+            scale.set_scale();
+            Serial.println("Calibrando... Retire los pesos de la báscula.");
+            delay(5000);
+            scale.tare();
+            Serial.println("Calibracion hecha...");
+            Serial.print("Coloque un peso conocido en la báscula...");
+            delay(5000);
+            long reading = scale.get_units(10);
+            Serial.print("Resultado de la calibración: ");
+            long calibration_final = reading / Known_Weight;
+            Serial.println(calibration_final);
+        }
+        else
+        {
+            Serial.println("Balanza no encontrada.");
+        }
+        delay(1000);
+    }
 }
