@@ -11,7 +11,7 @@
 #include <Wire.h>
 #include <BH1750.h>
 
-// Configuración agrupada
+// CHANGE // // CHANGE // // CHANGE // // CHANGE //
 #define TEAM_INITIALS "CRFZ"                   // Iniciales del equipo
 #define SECRET_NAME_TEAM "Carlos-Fizet"        // Nombre del equipo
 #define SECRET_CH_ID 2627355                   // ID del canal de ThingSpeak
@@ -20,6 +20,7 @@
 boolean Calibration_Weight_Sensor = false; // Modo de calibración de sensor de peso
 double Known_Weight = 14.7;                // Peso conocido para la calibración
 double Scale_Calibration_Result = 263;     // Resultado de calibración de la balanza
+// CHANGE // // CHANGE // // CHANGE // // CHANGE //
 
 // Definiciones para pines
 #define SDA_PIN 13
@@ -50,6 +51,8 @@ float tempC_Sensor_2;
 float Weight_Sensor;
 unsigned long previousMillis = 0; // Declaración de la variable global
 const long interval = 1000;       // Declaración de la variable global
+unsigned long lastReconnectAttempt = 0;
+const unsigned long RECONNECT_INTERVAL = 30000; // Intervalo de reconexión en milisegundos
 
 // Función de actualización de estado
 void tick_update_channel()
@@ -73,6 +76,7 @@ void tick_update_channel()
         Serial.println("Problema actualizando el canal. Código de error HTTP: " + String(x));
     }
 }
+
 void tick()
 {
     // toggle state
@@ -99,6 +103,34 @@ void printResolution(DeviceAddress deviceAddress)
     Serial.println();
 }
 
+// Función para verificar y reconectar a WiFi si es necesario
+void checkWiFiConnection()
+{
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        unsigned long currentMillis = millis();
+        if (currentMillis - lastReconnectAttempt >= RECONNECT_INTERVAL)
+        {
+            lastReconnectAttempt = currentMillis;
+            Serial.println("Intentando reconectar a WiFi...");
+            WiFiManager wm;
+            wm.setTimeout(60);                                               // 3 minutos para intentar la conexión
+            String ssid = "Deshidratador IoT 2024 " + String(TEAM_INITIALS); // Nombre de la red
+            digitalWrite(LED_WiFi, HIGH);
+            if (!wm.autoConnect(ssid.c_str()))
+            {
+                Serial.println("No se pudo conectar. Intentando de nuevo...");
+            }
+            else
+            {
+                Serial.println("Reconexión exitosa.");
+                digitalWrite(LED_WiFi, LOW);
+                
+            }
+        }
+    }
+}
+
 void setup()
 {
     pinMode(LED_WiFi, OUTPUT);
@@ -117,7 +149,6 @@ void setup()
     digitalWrite(DHT_VIRTUAL_PIN_GND, LOW);
     digitalWrite(DHT_VIRTUAL_PIN_VCC, HIGH);
 
-    //
     // Obtener la dirección MAC del ESP32 y formatearla
     String name_iot = "Deshidratador IoT 2024 " + String(TEAM_INITIALS); // Nombre de la red sin MAC
 
@@ -125,7 +156,6 @@ void setup()
     {
         Serial.println("Modo Normal");
         WiFiManager wm;
-
         bool res;
         res = wm.autoConnect(name_iot.c_str()); // Usar la cadena con el nombre modificado
         ticker.attach(0.1, tick);
@@ -187,6 +217,8 @@ void setup()
 
 void loop()
 {
+    checkWiFiConnection(); // Verifica y reconecta si es necesario
+
     if (!Calibration_Weight_Sensor)
     {
         unsigned long currentMillis = millis();
